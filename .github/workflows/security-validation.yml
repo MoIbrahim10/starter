@@ -1,0 +1,49 @@
+name: Security branch validation
+
+on:
+  push:
+    branches:
+      - security/fix-dependencies
+
+permissions:
+  contents: read
+
+concurrency:
+  group: starter-security-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Static checks and isolated unit tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .tool-versions
+
+      - name: Install locked dependencies without lifecycle scripts
+        run: bun install --frozen-lockfile --ignore-scripts --registry=https://registry.npmjs.org
+
+      - name: Run repository static checks
+        run: bun run check
+
+      - name: Run isolated unit tests
+        run: >-
+          bun --bun vitest run
+          packages/crypto/crypto.server.test.ts
+          packages/date/expiration.test.ts
+          packages/date/format-date.test.ts
+          packages/form/parse-form-data.test.ts
+          packages/mdx/utils.test.ts
